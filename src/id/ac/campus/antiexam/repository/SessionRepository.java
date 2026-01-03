@@ -85,9 +85,10 @@ public class SessionRepository {
         }
     }
 
+    // === FITUR BUAT LIAT STATUS MAHASISWA SATU KELAS ===
     public List<Object[]> listSessionsSummary(int examIdFilter) throws Exception {
         List<Object[]> list = new ArrayList<>();
-        // Added score to SELECT query
+        // Select skor juga ya ngab, biar ketauan pinter apa hoki
         String sql = "SELECT se.id, se.exam_id, s.name, se.status, se.started_at, se.violation_count, se.score FROM student_exams se JOIN students s ON se.student_id = s.id WHERE se.exam_id = ? ORDER BY se.id DESC";
         try (Connection conn = DBConnection.getConnection();
                 PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -109,17 +110,52 @@ public class SessionRepository {
         return list;
     }
 
+    // === INI KHUSUS BUAT DOSEN BIAR BISA INTIP SEMUA HASIL UJIAN MEREKA ===
+    public List<Object[]> listAllSessionsForLecturer(String lecturerUsername) throws Exception {
+        List<Object[]> list = new ArrayList<>();
+        // Join banyak tabel nih bos, ati-ati query berat
+        String sql = "SELECT se.id, se.exam_id, s.name, se.status, se.started_at, se.violation_count, se.score " +
+                "FROM student_exams se " +
+                "JOIN students s ON se.student_id = s.id " +
+                "JOIN exams e ON se.exam_id = e.id " +
+                "WHERE e.lecturer_username = ? " +
+                "ORDER BY se.id DESC";
+
+        try (Connection conn = DBConnection.getConnection();
+                PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, lecturerUsername);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    // Masukin data ke list biar bisa dipake di tabel
+                    list.add(new Object[] {
+                            rs.getInt("id"),
+                            rs.getInt("exam_id"),
+                            rs.getString("name"),
+                            rs.getString("status"),
+                            rs.getTimestamp("started_at"),
+                            rs.getInt("violation_count"),
+                            rs.getInt("score")
+                    });
+                }
+            }
+        }
+        return list;
+    }
+
+    // === UPDATE STATUS SESI, LOCK/UNLOCK GTU DEH ===
     public void updateStatus(int sessionId, String status) throws Exception {
+        // Kalo FINISHED, catet waktu selesainya jugak
         String sql = "UPDATE student_exams SET status = ?, finished_at = CASE WHEN ? = 'FINISHED' AND finished_at IS NULL THEN CURRENT_TIMESTAMP ELSE finished_at END WHERE id = ?";
         try (Connection conn = DBConnection.getConnection();
                 PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, status);
             ps.setString(2, status);
             ps.setInt(3, sessionId);
-            ps.executeUpdate();
+            ps.executeUpdate(); // Gass eksekusi
         }
     }
 
+    // === TOMBOL NUKLIR: AKHIRI SEMUA SESI SATU UJIAN ===
     public void updateStatusByExam(int examId, String status) throws Exception {
         String sql = "UPDATE student_exams SET status = ?, finished_at = CASE WHEN ? = 'FINISHED' AND finished_at IS NULL THEN CURRENT_TIMESTAMP ELSE finished_at END WHERE exam_id = ?";
         try (Connection conn = DBConnection.getConnection();

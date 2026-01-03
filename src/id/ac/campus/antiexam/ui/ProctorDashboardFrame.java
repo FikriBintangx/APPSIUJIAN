@@ -11,8 +11,10 @@ import java.util.List;
 
 public class ProctorDashboardFrame extends JFrame {
 
+    // === DASHBOARD KHUSUS PENGAWAS, YANG LAIN MINGGIR DLU ===
     private static final String APP_LOGO_PATH = "C:\\Users\\fikri\\Documents\\NetBeansProjects\\Appujian\\assets\\logo.png";
     private final String proctorUsername;
+    // Repo buat urusan database, jangan diotak-atik ntar error
     private final ExamRepository examRepository = new ExamRepository();
     private final SessionRepository sessionRepository = new SessionRepository();
 
@@ -23,16 +25,19 @@ public class ProctorDashboardFrame extends JFrame {
 
     private JTable examTable;
     private DefaultTableModel examModel;
+    // Tabel sesi buat mantau bocil-bocil ujian
     private JTable sessionTable;
     private DefaultTableModel sessionModel;
 
     private JLabel lblStatTotal, lblStatOngoing, lblStatViolations;
     private JLabel lblMonitoringTitle;
+    private JTextField txtToken; // Field buat nampilin token biar kece
 
+    // Timer buat refresh otomatis biar ga capek mencet F5
     private Timer liveTimer;
     private int selectedExamId = -1;
 
-    // Neo-Brutalism Palette
+    // Neo-Brutalism Palette: Warna gonjreng biar ga ngantuk
     private final Color COL_PRIMARY = new Color(88, 101, 242); // Neo Blue
     private final Color COL_SECONDARY = new Color(16, 185, 129);
     private final Color COL_BG_MAIN = new Color(248, 250, 252);
@@ -138,10 +143,12 @@ public class ProctorDashboardFrame extends JFrame {
         header.setBorder(new EmptyBorder(0, 32, 0, 32));
 
         JLabel lblTitle = new JLabel("Pengawasan Ujian");
+        // Judul gede biar keliatan dari jauh
         lblTitle.setFont(FONT_H2);
 
         JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 0));
         rightPanel.setOpaque(false);
+        // Tombol keluar, kalo udah capek idup
         NeoButton btnLogout = new NeoButton("Keluar", COL_DANGER, Color.WHITE);
         btnLogout.addActionListener(e -> {
             new RoleChooserFrame().setVisible(true);
@@ -198,12 +205,20 @@ public class ProctorDashboardFrame extends JFrame {
         };
         examTable = createStyledTable(examModel);
 
-        NeoButton btnSelect = new NeoButton("Mulai Monitoring", COL_PRIMARY, Color.WHITE);
+        NeoButton btnSelect = new NeoButton("Mulai Ujian", COL_PRIMARY, Color.WHITE);
         btnSelect.addActionListener(e -> selectExam());
+
+        NeoButton btnPreview = new NeoButton("👁️ Preview Soal", COL_INFO, Color.WHITE);
+        btnPreview.addActionListener(e -> previewExam());
+
+        JPanel examFooter = new JPanel(new GridLayout(1, 2, 10, 0));
+        examFooter.setOpaque(false);
+        examFooter.add(btnPreview);
+        examFooter.add(btnSelect);
 
         exCard.add(headEx, BorderLayout.NORTH);
         exCard.add(new JScrollPane(examTable), BorderLayout.CENTER);
-        exCard.add(btnSelect, BorderLayout.SOUTH);
+        exCard.add(examFooter, BorderLayout.SOUTH);
 
         // Monitoring (Center)
         NeoPanel monCard = new NeoPanel();
@@ -212,7 +227,35 @@ public class ProctorDashboardFrame extends JFrame {
 
         lblMonitoringTitle = new JLabel("Live Monitoring");
         lblMonitoringTitle.setFont(FONT_H2);
-        monCard.add(lblMonitoringTitle, BorderLayout.NORTH);
+        lblMonitoringTitle = new JLabel("Live Monitoring");
+        lblMonitoringTitle.setFont(FONT_H2);
+
+        // Panel buat Header Monitoring + Token
+        JPanel monHeader = new JPanel(new BorderLayout());
+        monHeader.setOpaque(false);
+        monHeader.add(lblMonitoringTitle, BorderLayout.WEST);
+
+        // Token Display
+        JPanel tokenPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        tokenPanel.setOpaque(false);
+        JLabel lblToken = new JLabel("TOKEN: ");
+        lblToken.setFont(new Font("Segoe UI", Font.BOLD, 16));
+
+        txtToken = new JTextField(" - - - - - ");
+        txtToken.setEditable(false);
+        txtToken.setFont(new Font("Consolas", Font.BOLD, 24));
+        txtToken.setHorizontalAlignment(JTextField.CENTER);
+        txtToken.setBackground(new Color(255, 241, 118)); // Kuning stabilo
+        txtToken.setForeground(Color.BLACK);
+        txtToken.setBorder(BorderFactory.createMatteBorder(2, 2, 2, 2, Color.BLACK));
+        txtToken.setPreferredSize(new Dimension(150, 40));
+
+        tokenPanel.add(lblToken);
+        tokenPanel.add(txtToken);
+
+        monHeader.add(tokenPanel, BorderLayout.EAST);
+
+        monCard.add(monHeader, BorderLayout.NORTH);
 
         sessionModel = new DefaultTableModel(new Object[] { "ID Sesi", "Mahasiswa", "Status", "Mulai", "Pelanggaran" },
                 0) {
@@ -306,22 +349,45 @@ public class ProctorDashboardFrame extends JFrame {
     }
 
     private void selectExam() {
+        // PILIH UJIAN BIAR BISA DI-START NGAB
         int r = examTable.getSelectedRow();
         if (r == -1) {
-            JOptionPane.showMessageDialog(this, "Pilih ujian!");
+            JOptionPane.showMessageDialog(this, "Pilih ujian dlu kocak!");
             return;
         }
         selectedExamId = (Integer) examModel.getValueAt(r, 0);
         String title = (String) examModel.getValueAt(r, 3);
-        lblMonitoringTitle.setText("Monitoring: " + title);
 
-        // Start Live Poll
-        if (liveTimer == null) {
-            liveTimer = new Timer(3000, e -> loadSessions());
-            liveTimer.start();
+        try {
+            // Gass mulai ujian, status jadi ONGOING
+            examRepository.startExam(selectedExamId);
+            lblMonitoringTitle.setText("Monitoring: " + title);
+
+            // Generate Token Random biar keren
+            String token = generateToken();
+            txtToken.setText(token);
+
+            // Start Live Poll: cek terus tiap 3 detik
+            if (liveTimer == null) {
+                liveTimer = new Timer(3000, e -> loadSessions());
+                liveTimer.start();
+            }
+            loadSessions(); // Initial load
+            JOptionPane.showMessageDialog(this, "Ujian DIMULAI! Token: " + token + "\nMode serius activacted 🤫");
+        } catch (Exception e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Gagal memulai ujian: " + e.getMessage() + " (Fix internet lu bang)");
         }
-        loadSessions(); // Initial
-        JOptionPane.showMessageDialog(this, "Monitoring dimulai untuk: " + title);
+    }
+
+    private String generateToken() {
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 6; i++) {
+            int idx = (int) (Math.random() * chars.length());
+            sb.append(chars.charAt(idx));
+        }
+        return sb.toString();
     }
 
     private void loadSessions() {
@@ -377,6 +443,89 @@ public class ProctorDashboardFrame extends JFrame {
             loadSessions();
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    private void previewExam() {
+        // LIAT SOAL BIAR GA GABUT DOANG
+        int r = examTable.getSelectedRow();
+        if (r == -1) {
+            JOptionPane.showMessageDialog(this, "Pilih ujian dulu ngab!");
+            return;
+        }
+        int exId = (Integer) examModel.getValueAt(r, 0);
+        new QuestionPreviewDialog(this, exId).setVisible(true);
+    }
+
+    // === DIALOG PREVIEW SOAL (READ ONLY) ===
+    private class QuestionPreviewDialog extends JDialog {
+        public QuestionPreviewDialog(Frame owner, int examId) {
+            super(owner, "Preview Soal Ujian", true);
+            setSize(900, 600);
+            setLocationRelativeTo(owner);
+            setLayout(new BorderLayout());
+
+            // Header
+            JPanel header = new JPanel(new FlowLayout(FlowLayout.LEFT));
+            header.setBackground(Color.WHITE);
+            header.setBorder(new EmptyBorder(15, 20, 15, 20));
+
+            JLabel lbl = new JLabel("Daftar Soal Ujian");
+            lbl.setFont(FONT_H2);
+            header.add(lbl);
+            add(header, BorderLayout.NORTH);
+
+            // Table
+            DefaultTableModel model = new DefaultTableModel(
+                    new Object[] { "No", "Pertanyaan", "Opsi A", "Opsi B", "Opsi C", "Opsi D", "Kunci" }, 0) {
+                public boolean isCellEditable(int row, int col) {
+                    return false;
+                }
+            };
+
+            JTable table = new JTable(model);
+            table.setRowHeight(35);
+            table.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+            table.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 14));
+            table.setShowGrid(true);
+            table.setGridColor(new Color(220, 220, 220));
+
+            table.getColumnModel().getColumn(0).setMaxWidth(40);
+            table.getColumnModel().getColumn(6).setMaxWidth(60);
+
+            try (java.sql.Connection conn = id.ac.campus.antiexam.config.DBConnection.getConnection()) {
+                String sql = "SELECT * FROM exam_questions WHERE exam_id = ? ORDER BY id ASC";
+                java.sql.PreparedStatement ps = conn.prepareStatement(sql);
+                ps.setInt(1, examId);
+                java.sql.ResultSet rs = ps.executeQuery();
+                int no = 1;
+                while (rs.next()) {
+                    model.addRow(new Object[] {
+                            no++,
+                            rs.getString("question_text"),
+                            rs.getString("option_a"),
+                            rs.getString("option_b"),
+                            rs.getString("option_c"),
+                            rs.getString("option_d"),
+                            rs.getString("correct_answer")
+                    });
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            add(new JScrollPane(table), BorderLayout.CENTER);
+
+            // Close Button
+            NeoButton btnClose = new NeoButton("Tutup Preview", COL_DANGER, Color.WHITE);
+            btnClose.setPreferredSize(new Dimension(150, 45));
+            btnClose.addActionListener(e -> dispose());
+
+            JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+            footer.setOpaque(false);
+            footer.setBorder(new EmptyBorder(10, 20, 10, 20));
+            footer.add(btnClose);
+            add(footer, BorderLayout.SOUTH);
         }
     }
 

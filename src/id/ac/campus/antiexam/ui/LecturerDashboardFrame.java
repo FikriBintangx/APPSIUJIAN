@@ -15,18 +15,22 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.List;
+import id.ac.campus.antiexam.repository.SubjectRepository;
 
 public class LecturerDashboardFrame extends JFrame {
 
     private static final String APP_LOGO_PATH = "C:\\Users\\fikri\\Documents\\NetBeansProjects\\Appujian\\assets\\logo.png";
 
+    // === INI BASE BUAT DOSEN, JANGAN DISENGGOL NGAB ===
     private final String lecturerUsername;
     private final ExamRepository examRepository = new ExamRepository();
     private final SessionRepository sessionRepository = new SessionRepository();
+    // Repository buat ngambil data, penting bat ini wir
+    private final SubjectRepository subjectRepository = new SubjectRepository();
 
     private CardLayout contentCardLayout;
+    // Panel utama nih boss, tempat gonta-ganti view
     private JPanel mainContentPanel;
-
     private JButton btnMenuOverview;
     private JButton btnMenuSettings;
     private JButton btnMenuReport;
@@ -34,10 +38,11 @@ public class LecturerDashboardFrame extends JFrame {
 
     private JTable examTable;
     private DefaultTableModel examModel;
-
+    // Tabel buat sesi ujian, valid no debatt
     private JTable sessionTable;
     private DefaultTableModel sessionModel;
 
+    // === INI BUAT LAPORAN UJIAN YE KAN ===
     private JTable reportTable;
     private DefaultTableModel reportModel;
 
@@ -128,20 +133,24 @@ public class LecturerDashboardFrame extends JFrame {
     }
 
     private JPanel createSidebar() {
+        // Bikin sidebar biar estetik parah
         JPanel sidebar = new JPanel(new BorderLayout());
         sidebar.setBackground(COL_BG_SIDEBAR);
         sidebar.setPreferredSize(new Dimension(280, getHeight()));
+        // Garis tepi item, biar ga polos kek hidup lu
         sidebar.setBorder(BorderFactory.createMatteBorder(0, 0, 0, 4, Color.BLACK));
 
         JPanel brandPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 16, 18));
         brandPanel.setOpaque(false);
 
         JLabel lblLogo = new JLabel("SiUjian");
-        lblLogo.setFont(new Font("Segoe UI", Font.BOLD, 26));
+        // Font tebel biar menyala abangku
+        lblLogo.setFont(new Font("Segoe UI", Font.BOLD, 22));
         lblLogo.setForeground(Color.WHITE);
 
         JLabel lblSubtitle = new JLabel("Dosen Panel");
-        lblSubtitle.setFont(FONT_SMALL);
+        // Subtitle kecil aja, yang penting ada
+        lblSubtitle.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         lblSubtitle.setForeground(new Color(224, 231, 255));
 
         JPanel textPanel = new JPanel();
@@ -279,17 +288,11 @@ public class LecturerDashboardFrame extends JFrame {
         statsPanel.add(createStatCard("Sedang Ujian", lblStatOngoing, COL_SECONDARY));
         statsPanel.add(createStatCard("Mencurigakan", lblStatViolations, COL_DANGER));
 
-        JPanel contentSplit = new JPanel(new BorderLayout(20, 0));
-        contentSplit.setOpaque(false);
-
+        // Only Exam List for Lecturer, no monitoring
         NeoPanel examListCard = createExamListCard();
-        NeoPanel monitoringCard = createMonitoringCard();
-
-        contentSplit.add(examListCard, BorderLayout.WEST);
-        contentSplit.add(monitoringCard, BorderLayout.CENTER);
 
         panel.add(statsPanel, BorderLayout.NORTH);
-        panel.add(contentSplit, BorderLayout.CENTER);
+        panel.add(examListCard, BorderLayout.CENTER);
 
         return panel;
     }
@@ -315,7 +318,7 @@ public class LecturerDashboardFrame extends JFrame {
     private NeoPanel createExamListCard() {
         NeoPanel card = new NeoPanel();
         card.setLayout(new BorderLayout());
-        card.setPreferredSize(new Dimension(450, 0));
+        // card.setPreferredSize(new Dimension(450, 0)); // Full width now
         card.setBorder(new EmptyBorder(20, 20, 20, 20));
 
         JPanel headerPanel = new JPanel(new BorderLayout());
@@ -342,75 +345,32 @@ public class LecturerDashboardFrame extends JFrame {
         };
         examTable = createStyledTable(examModel);
 
-        NeoButton btnSelect = new NeoButton("Mulai Monitoring", COL_PRIMARY, Color.WHITE);
-        btnSelect.addActionListener(e -> selectExam());
+        // No Action Button for Lecturer here, they just view
+        // NeoButton btnSelect = new NeoButton("Mulai Monitoring", COL_PRIMARY,
+        // Color.WHITE);
+        // btnSelect.addActionListener(e -> selectExam());
 
         card.add(headerPanel, BorderLayout.NORTH);
         card.add(new JScrollPane(examTable), BorderLayout.CENTER);
-        card.add(btnSelect, BorderLayout.SOUTH);
 
-        return card;
-    }
-
-    private NeoPanel createMonitoringCard() {
-        NeoPanel card = new NeoPanel();
-        card.setLayout(new BorderLayout());
-        card.setBorder(new EmptyBorder(20, 20, 20, 20));
-
-        JPanel header = new JPanel(new BorderLayout());
-        header.setOpaque(false);
-
-        JLabel lblTitle = new JLabel("Live Monitoring");
-        lblTitle.setFont(FONT_H2);
-        lblTitle.setForeground(COL_TEXT_DARK);
-
-        JLabel lblStatus = new JLabel("Menunggu Pilihan Ujian");
-        lblStatus.setFont(FONT_BODY);
-        lblStatus.setForeground(COL_TEXT_LIGHT);
-        this.lblSettingTitle = lblStatus;
-
-        JPanel headerRight = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        headerRight.setOpaque(false);
-        headerRight.add(lblStatus);
-
-        header.add(lblTitle, BorderLayout.WEST);
-        header.add(headerRight, BorderLayout.EAST);
-
-        sessionModel = new DefaultTableModel(
-                new Object[] { "ID Sesi", "Nama Mahasiswa", "Status", "Mulai", "Pelanggaran" }, 0) {
-            public boolean isCellEditable(int row, int column) {
-                return false;
+        // === TOMBOL BUAT NGATUR SOAL, BIAR GA INPUT MANUAL DI KERTAS ===
+        NeoButton btnManageQuestions = new NeoButton("📝 Atur Soal Ujian Ini", COL_PRIMARY, Color.WHITE);
+        btnManageQuestions.addActionListener(e -> {
+            int row = examTable.getSelectedRow();
+            if (row == -1) {
+                JOptionPane.showMessageDialog(this, "Pilih ujian dulu ngab! Jangan ghosting 👻");
+                return;
             }
-        };
-        sessionTable = createStyledTable(sessionModel);
+            int examId = (Integer) examModel.getValueAt(row, 0);
+            // Buka editor soal, mode serius on
+            new ManualQuestionEditorDialog(this, examId).setVisible(true);
+        });
 
-        JScrollPane scrollTable = new JScrollPane(sessionTable);
-        // Style scrollpane border
-        scrollTable.setBorder(BorderFactory.createLineBorder(Color.BLACK, 2));
+        JPanel footerPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        footerPanel.setOpaque(false);
+        footerPanel.add(btnManageQuestions);
 
-        JPanel footer = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        footer.setOpaque(false);
-        footer.setBorder(new EmptyBorder(15, 0, 0, 0));
-
-        NeoButton btnFreeze = new NeoButton("Bekukan", COL_INFO, Color.WHITE);
-        NeoButton btnUnfreeze = new NeoButton("Buka Kunci", COL_SECONDARY, Color.WHITE);
-        NeoButton btnKick = new NeoButton("Stop", COL_DANGER, Color.WHITE);
-        NeoButton btnEndAll = new NeoButton("Akhiri Semua", COL_DANGER, Color.WHITE);
-
-        btnFreeze.addActionListener(e -> performActionOnSelected("FREEZE"));
-        btnUnfreeze.addActionListener(e -> performActionOnSelected("UNFREEZE"));
-        btnKick.addActionListener(e -> performActionOnSelected("KICK"));
-        btnEndAll.addActionListener(e -> endExamForAll());
-
-        footer.add(btnFreeze);
-        footer.add(btnUnfreeze);
-        footer.add(btnKick);
-        footer.add(Box.createHorizontalStrut(20));
-        footer.add(btnEndAll);
-
-        card.add(header, BorderLayout.NORTH);
-        card.add(scrollTable, BorderLayout.CENTER);
-        card.add(footer, BorderLayout.SOUTH);
+        card.add(footerPanel, BorderLayout.SOUTH);
 
         return card;
     }
@@ -476,20 +436,24 @@ public class LecturerDashboardFrame extends JFrame {
     }
 
     private JPanel createSettingsView() {
+        // MENU ATUR UJIAN NIH BOSS SENGGOL DONG
         JPanel panel = new JPanel(new GridBagLayout());
         panel.setOpaque(false);
 
         NeoPanel card = new NeoPanel();
         card.setLayout(new BorderLayout());
         card.setBorder(new EmptyBorder(40, 40, 40, 40));
+        // Ukuran pas biar ga meluber kemana-mana
         card.setPreferredSize(new Dimension(650, 600));
 
         JLabel lblTitle = new JLabel("Atur Ujian");
         lblTitle.setFont(FONT_H1);
+        // Warna biru neo, kece badai
         lblTitle.setForeground(COL_PRIMARY);
         lblTitle.setHorizontalAlignment(SwingConstants.CENTER);
         card.add(lblTitle, BorderLayout.NORTH);
 
+        // Form buat ngisi data ujian, jangan sampe kosong ntar diomelin mahasiswa
         JPanel form = new JPanel(new GridBagLayout());
         form.setOpaque(false);
         form.setBorder(new EmptyBorder(30, 0, 30, 0));
@@ -798,28 +762,26 @@ public class LecturerDashboardFrame extends JFrame {
     }
 
     private void loadReportData() {
+        // LOAD DATA LAPORAN, BIAR TAU SIAPA YG NILAONYA JELEK
+        reportModel.setRowCount(0);
+        // Pake worker biar UI ga nge-freeze kek otak pas ujian
         new SwingWorker<List<Object[]>, Void>() {
             @Override
-            protected List<Object[]> doInBackground() {
-                List<Object[]> all = new ArrayList<>();
-                for (int i = 0; i < examModel.getRowCount(); i++) {
-                    try {
-                        all.addAll(sessionRepository.listSessionsSummary((Integer) examModel.getValueAt(i, 0)));
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                }
-                return all;
+            protected List<Object[]> doInBackground() throws Exception {
+                // Tarik data dari repository gan
+                return sessionRepository.listAllSessionsForLecturer(lecturerUsername);
             }
 
             @Override
             protected void done() {
                 try {
-                    List<Object[]> res = get();
-                    reportModel.setRowCount(0);
-                    for (Object[] r : res)
-                        reportModel.addRow(r);
+                    // Kalo udah kelar, masukin ke tabel
+                    List<Object[]> data = get();
+                    for (Object[] row : data) {
+                        reportModel.addRow(row);
+                    }
                 } catch (Exception e) {
+                    e.printStackTrace(); // Kalo eror ya maap
                 }
             }
         }.execute();
@@ -890,55 +852,32 @@ public class LecturerDashboardFrame extends JFrame {
     }
 
     private void saveSettings(JPanel form) {
+        // SIMPAN SETTINGAN UJIAN, JANGAN LUPA BISMILLAH DLU
         if (selectedExamId == -1) {
-            JOptionPane.showMessageDialog(this, "Pilih Ujian dulu!");
+            JOptionPane.showMessageDialog(this, "Pilih Ujian dulu ngab!");
             return;
         }
 
         try {
-            // Get selected proctor from the component stored in client property
+            // Ambil proctor yg dipilih, biar ada yg jagain ujian
             JComboBox<String> cmbProctor = (JComboBox<String>) form.getClientProperty("cmbSettingProctor");
             String selectedProctor = (String) cmbProctor.getSelectedItem();
 
-            // Existing logic
-            // Assuming cmbQuestionType, cmbExamType, spSettingDuration are accessible
-            // fields
+            // Ambil tipe ujian dkk
             String qType = (String) cmbQuestionType.getSelectedItem();
             String eType = (String) cmbExamType.getSelectedItem();
             int duration = (int) spSettingDuration.getValue();
 
-            // We update the exam.
-            // Note: Since we don't have a direct 'updateSettings' method in repo that
-            // handles just these,
-            // we might need to use a custom update or reuse updateExam but we need ALL
-            // params for updateExam.
-            // Alternatively, create a specific update method in repository.
-            // For now, let's use a Direct SQL update here or assume a new repo method
-            // exists.
-            // Since I cannot easily change repo API without risking others, I'll do a
-            // direct update helper here
-            // OR use the repository if applicable.
+            // Gass update ke database
+            updateExamSettings(selectedExamId, eType, duration, selectedProctor);
 
-            // Checking ExamRepository, updateExam needs everything.
-            // Let's rely on a helper method 'updateExamSettings' which simply runs a SQL
-            // UPDATE.
-            updateExamSettings(selectedExamId, eType, duration, selectedProctor); // We'll add this heper
-
-            // Also need to handle Question Type? The DB schema 'type' column is usually
-            // UTS/UAS.
-            // Question Mode (PG/Essay) might be implicit or stored in 'questions' table?
-            // Re-reading 'startExam' logic, it seems 'selectedExamMode' is used.
-            // But where is it stored? In the 'exams' table?
-            // Looking at DataSeeder: type TEXT (UTS/UAS).
-            // Maybe we can repurpose a column or just stick to UTS/UAS for now.
-            // The USER req says "DOSEN MEMBUAT SOAL DAN JAWABAN", "DOSEN MEMILIH PENGAWAS".
-
-            JOptionPane.showMessageDialog(this, "Pengaturan & Pengawas tersimpan!");
-            loadExams(); // Refresh list
-            switchView("VIEW_OVERVIEW", btnMenuOverview);
+            // Infoin ke user kalo sukses
+            JOptionPane.showMessageDialog(this, "Pengaturan & Pengawas tersimpan! Menyala abangku 🔥");
+            loadExams(); // Refresh list biar update
+            switchView("VIEW_OVERVIEW", btnMenuOverview); // Balik ke menu awal
 
         } catch (Exception e) {
-            e.printStackTrace();
+            e.printStackTrace(); // Eror boss, cek log
             JOptionPane.showMessageDialog(this, "Gagal simpan: " + e.getMessage());
         }
     }

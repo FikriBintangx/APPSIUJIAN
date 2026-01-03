@@ -1,361 +1,502 @@
 package id.ac.campus.antiexam.ui;
 
 import id.ac.campus.antiexam.config.DBConnection;
+import id.ac.campus.antiexam.service.PdfExportService;
 import javax.swing.*;
+import javax.swing.border.Border;
 import javax.swing.border.EmptyBorder;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.JTableHeader;
 import java.awt.*;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.util.ArrayList;
+import java.util.List;
 
 public class ManualQuestionEditorDialog extends JDialog {
 
+    // === INI AREA KHUSUS EDITOR, DILARANG PARKIR ===
     private final int examId;
     private DefaultTableModel questionModel;
     private JTable questionTable;
+
+    // Field buat isi soal, biar dosen ga pusing
     private JTextArea txtQuestion;
     private JTextField txtOptA, txtOptB, txtOptC, txtOptD;
-    private JComboBox<String> cmbCorrect;
 
-    private final Color PRIMARY = new Color(37, 99, 235);
-    private final Color SUCCESS = new Color(16, 185, 129);
-    private final Color DANGER = new Color(239, 68, 68);
-    private final Color BG_LIGHT = new Color(249, 250, 251);
+    // Pake Radio Button biar kayak Google Form beneran, ga ribet pilih dropdown
+    private JRadioButton rbA, rbB, rbC, rbD;
+    private ButtonGroup bgCorrect;
+
+    // Palette Warna Gen Z Neo-Brutalism
+    private final Color COL_PRIMARY = new Color(88, 101, 242); // Blurple
+    private final Color COL_SUCCESS = new Color(34, 197, 94); // Green
+    private final Color COL_DANGER = new Color(239, 68, 68); // Red
+    private final Color COL_WARNING = new Color(245, 158, 11); // Orange
+    private final Color COL_BG = new Color(255, 255, 255); // White clean
+    private final Font FONT_BOLD = new Font("Segoe UI", Font.BOLD, 14);
+    private final Font FONT_PLAIN = new Font("Segoe UI", Font.PLAIN, 14);
 
     public ManualQuestionEditorDialog(Frame parent, int examId) {
-        super(parent, "✍️ Editor Soal Manual (Google Form Style)", true);
+        super(parent, "✨ Editor Soal Ultra Friendly (Google Form Style)", true);
         this.examId = examId;
-        setSize(1200, 750);
+        setSize(1280, 800);
         setLocationRelativeTo(parent);
+
+        // Setup UI biar estetik parah
         initComponents();
-        loadQuestions();
+        loadQuestions(); // Load data lama biar ga amnesia
     }
 
     private void initComponents() {
         setLayout(new BorderLayout());
-        getContentPane().setBackground(BG_LIGHT);
+        setBackground(Color.WHITE);
 
-        // === LEFT PANEL: Question List ===
+        // === PANEL KIRI: LIST SOAL ===
+        // Biar keliatan list soalnya di kiri, kek navigasi gitu
         JPanel leftPanel = new JPanel(new BorderLayout(0, 15));
-        leftPanel.setBackground(Color.WHITE);
-        leftPanel.setBorder(new EmptyBorder(20, 20, 20, 15));
-        leftPanel.setPreferredSize(new Dimension(450, 0));
+        leftPanel.setBackground(new Color(248, 250, 252)); // Agak abu dikit
+        leftPanel.setBorder(BorderFactory.createMatteBorder(0, 0, 0, 3, Color.BLACK)); // Garis tebel dikanan
+        leftPanel.setPreferredSize(new Dimension(400, 0));
 
-        JLabel lblListTitle = new JLabel("📋 Daftar Soal Tersimpan:");
-        lblListTitle.setFont(new Font("Segoe UI", Font.BOLD, 18));
-        lblListTitle.setForeground(PRIMARY);
+        // Header Kiri
+        JPanel leftHeader = new JPanel(new BorderLayout());
+        leftHeader.setOpaque(false);
+        leftHeader.setBorder(new EmptyBorder(20, 20, 0, 20));
+        JLabel lblList = new JLabel("📚 Bank Soal");
+        lblList.setFont(new Font("Segoe UI", Font.BOLD, 22));
+        leftHeader.add(lblList, BorderLayout.CENTER);
 
-        // Add "New Question" button at top
-        JButton btnNew = createBtn("➕ Tambah Soal Baru", true, SUCCESS);
-        btnNew.setFont(new Font("Segoe UI", Font.BOLD, 15));
-        btnNew.setPreferredSize(new Dimension(0, 50)); // Taller for emphasis
-        btnNew.addActionListener(e -> {
-            clearForm();
-            txtQuestion.requestFocus();
-            JOptionPane.showMessageDialog(this,
-                    "<html><div style='text-align:center; padding:10px;'>" +
-                            "<h2 style='color:#10B981;'>✍️ Mode Tambah Soal</h2>" +
-                            "<p style='font-size:13px;'>Silakan isi form di panel kanan,<br>lalu klik tombol <b>\"💾 Simpan Soal\"</b> di bawah.</p>"
-                            +
-                            "</div></html>",
-                    "Info",
-                    JOptionPane.INFORMATION_MESSAGE);
-        });
+        // Tombol Tambah Soal (Paling Gede & Hijau)
+        NeoButton btnAdd = new NeoButton("➕ Buat Soal Baru", COL_SUCCESS, Color.WHITE);
+        btnAdd.setPreferredSize(new Dimension(0, 50));
+        btnAdd.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        btnAdd.addActionListener(e -> resetForm()); // Reset form biar bersih
 
-        JPanel topPanel = new JPanel(new BorderLayout(0, 10));
-        topPanel.setBackground(Color.WHITE);
-        topPanel.add(lblListTitle, BorderLayout.NORTH);
-        topPanel.add(btnNew, BorderLayout.SOUTH);
+        JPanel btnAddWrapper = new JPanel(new BorderLayout());
+        btnAddWrapper.setOpaque(false);
+        btnAddWrapper.setBorder(new EmptyBorder(15, 20, 15, 20));
+        btnAddWrapper.add(btnAdd, BorderLayout.CENTER);
 
-        questionModel = new DefaultTableModel(new Object[] { "No", "Soal", "Kunci" }, 0) {
+        leftPanel.add(leftHeader, BorderLayout.NORTH);
+
+        // Table List Soal
+        questionModel = new DefaultTableModel(new Object[] { "No", "Preview Soal", "Kunci" }, 0) {
             public boolean isCellEditable(int row, int col) {
                 return false;
             }
         };
         questionTable = new JTable(questionModel);
-        questionTable.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        questionTable.setRowHeight(35);
-        questionTable.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 14));
-        questionTable.getTableHeader().setBackground(new Color(239, 246, 255));
-        questionTable.getTableHeader().setForeground(PRIMARY);
-        questionTable.setSelectionBackground(new Color(191, 219, 254));
-        questionTable.setGridColor(new Color(229, 231, 235));
+        styleTable(questionTable);
 
-        JButton btnLoad = createBtn("📝 Edit Soal Terpilih", false, PRIMARY);
-        btnLoad.addActionListener(e -> loadSelectedQuestion());
+        // Klik tabel langsung load data ke kanan
+        questionTable.getSelectionModel().addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting() && questionTable.getSelectedRow() != -1) {
+                loadSelectedQuestion();
+            }
+        });
 
-        JButton btnDelete = createBtn("🗑️ Hapus Soal Terpilih", false, DANGER);
+        JScrollPane scrollTable = new JScrollPane(questionTable);
+        scrollTable.setBorder(BorderFactory.createEmptyBorder());
+        scrollTable.getViewport().setBackground(Color.WHITE);
+
+        // Wrapper tabel biar ada isinya
+        JPanel tableWrapper = new JPanel(new BorderLayout());
+        tableWrapper.add(btnAddWrapper, BorderLayout.NORTH);
+        tableWrapper.add(scrollTable, BorderLayout.CENTER);
+        leftPanel.add(tableWrapper, BorderLayout.CENTER);
+
+        // Footer Kiri: Tombol Delete & Export
+        JPanel leftFooter = new JPanel(new GridLayout(2, 1, 5, 10));
+        leftFooter.setOpaque(false);
+        leftFooter.setBorder(new EmptyBorder(20, 20, 20, 20));
+
+        NeoButton btnDelete = new NeoButton("🗑️ Hapus Soal", COL_DANGER, Color.WHITE);
         btnDelete.addActionListener(e -> deleteQuestion());
 
-        JPanel btnPanel = new JPanel(new GridLayout(3, 1, 0, 10)); // 3 rows
-        btnPanel.setBackground(Color.WHITE);
-        btnPanel.add(btnLoad);
-        btnPanel.add(btnDelete);
-
-        JButton btnExport = createBtn("📄 Ekspor Soal ke PDF", false, new Color(59, 130, 246));
+        NeoButton btnExport = new NeoButton("📄 Export PDF", COL_PRIMARY, Color.WHITE);
         btnExport.addActionListener(e -> exportToPdf());
-        btnPanel.add(btnExport);
 
-        leftPanel.add(topPanel, BorderLayout.NORTH);
-        leftPanel.add(new JScrollPane(questionTable), BorderLayout.CENTER);
-        leftPanel.add(btnPanel, BorderLayout.SOUTH);
+        leftFooter.add(btnDelete);
+        leftFooter.add(btnExport);
+        leftPanel.add(leftFooter, BorderLayout.SOUTH);
 
-        // === RIGHT PANEL: Editor Form ===
-        JPanel rightPanel = new JPanel(new BorderLayout(0, 15));
-        rightPanel.setBackground(Color.WHITE);
-        rightPanel.setBorder(new EmptyBorder(20, 15, 20, 20));
+        // === PANEL KANAN: EDITOR FORM (GOOGLE FORM STYLE) ===
+        // Background abu-abu biar form-nya 'pop-up' kek kartu
+        JPanel rightPanel = new JPanel(new GridBagLayout());
+        rightPanel.setBackground(new Color(240, 244, 248));
 
-        JLabel lblFormTitle = new JLabel("✍ Editor Soal:");
-        lblFormTitle.setFont(new Font("Segoe UI", Font.BOLD, 20));
-        lblFormTitle.setForeground(PRIMARY);
+        // Wrapper Kartu Putih
+        NeoCard cardPanel = new NeoCard();
+        cardPanel.setLayout(new BorderLayout());
+        cardPanel.setPreferredSize(new Dimension(700, 650));
 
-        // Form Panel
+        // Strip Warna di Atas Kartu (Khas G-Form)
+        JPanel topStrip = new JPanel();
+        topStrip.setBackground(COL_PRIMARY);
+        topStrip.setPreferredSize(new Dimension(0, 10));
+        cardPanel.add(topStrip, BorderLayout.NORTH);
+
+        // Konten Kartu
+        JPanel cardContent = new JPanel(new BorderLayout());
+        cardContent.setBackground(Color.WHITE);
+        cardContent.setBorder(new EmptyBorder(30, 40, 30, 40));
+
+        // Header dalam Kartu
+        JPanel cardHeader = new JPanel(new GridLayout(2, 1));
+        cardHeader.setBackground(Color.WHITE);
+        JLabel lblEdit = new JLabel("Editor Soal");
+        lblEdit.setFont(new Font("Segoe UI", Font.BOLD, 24));
+        JLabel lblDesc = new JLabel("Silakan edit pertanyaan dan kunci jawaban di bawah ini.");
+        lblDesc.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        lblDesc.setForeground(Color.GRAY);
+
+        cardHeader.add(lblEdit);
+        cardHeader.add(lblDesc);
+        cardContent.add(cardHeader, BorderLayout.NORTH);
+
+        // Form Area
         JPanel formPanel = new JPanel(new GridBagLayout());
         formPanel.setBackground(Color.WHITE);
+
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.insets = new Insets(10, 0, 10, 0);
+        gbc.insets = new Insets(20, 0, 5, 0);
+        gbc.weightx = 1.0;
         gbc.gridx = 0;
         gbc.gridy = 0;
-        gbc.weightx = 1.0;
 
-        txtQuestion = new JTextArea(4, 40);
+        // 1. Input Pertanyaan
+        formPanel.add(createLabel("Pertanyaan"), gbc);
+        gbc.gridy++;
+
+        txtQuestion = new JTextArea(3, 20);
         txtQuestion.setLineWrap(true);
         txtQuestion.setWrapStyleWord(true);
-        txtQuestion.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        txtQuestion.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(229, 231, 235), 1),
-                new EmptyBorder(10, 10, 10, 10)));
-        txtQuestion.setBackground(BG_LIGHT);
-
-        txtOptA = createTextField();
-        txtOptB = createTextField();
-        txtOptC = createTextField();
-        txtOptD = createTextField();
-
-        cmbCorrect = new JComboBox<>(new String[] { "A", "B", "C", "D" });
-        cmbCorrect.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        cmbCorrect.setBackground(new Color(219, 234, 254));
-        ((JLabel) cmbCorrect.getRenderer()).setHorizontalAlignment(SwingConstants.CENTER);
-
-        addFormRow(formPanel, gbc, "Pertanyaan:", new JScrollPane(txtQuestion));
-        addFormRow(formPanel, gbc, "Pilihan A:", txtOptA);
-        addFormRow(formPanel, gbc, "Pilihan B:", txtOptB);
-        addFormRow(formPanel, gbc, "Pilihan C:", txtOptC);
-        addFormRow(formPanel, gbc, "Pilihan D:", txtOptD);
-        addFormRow(formPanel, gbc, "Kunci Jawaban:", cmbCorrect);
-
-        // Visual separator
+        txtQuestion.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+        txtQuestion.setBackground(new Color(250, 250, 250));
+        JScrollPane scrollQ = new JScrollPane(txtQuestion);
+        // Border bawah doang biar kek material
+        scrollQ.setBorder(BorderFactory.createMatteBorder(0, 0, 2, 0, new Color(200, 200, 200)));
+        formPanel.add(scrollQ, gbc);
         gbc.gridy++;
-        gbc.insets = new Insets(20, 0, 15, 0);
-        JSeparator separator = new JSeparator();
-        separator.setForeground(new Color(229, 231, 235));
-        formPanel.add(separator, gbc);
-        gbc.insets = new Insets(10, 0, 10, 0); // Reset
 
-        // Action Buttons - More prominent
-        JPanel actionPanel = new JPanel(new GridLayout(1, 2, 15, 0));
-        actionPanel.setBackground(Color.WHITE);
+        // Spacer
+        gbc.insets = new Insets(25, 0, 10, 0);
+        formPanel.add(createLabel("Opsi Jawaban & Kunci"), gbc);
+        gbc.gridy++;
+        gbc.insets = new Insets(10, 0, 10, 0);
 
-        JButton btnReset = createBtn("🔄 Reset Form", false, new Color(156, 163, 175));
-        btnReset.addActionListener(e -> clearForm());
+        // 2. Opsi Jawaban A, B, C, D
+        bgCorrect = new ButtonGroup();
 
-        JButton btnSave = createBtn("💾 SIMPAN SOAL BARU", true, SUCCESS);
-        btnSave.setFont(new Font("Segoe UI", Font.BOLD, 16)); // Larger font
-        btnSave.setPreferredSize(new Dimension(0, 55)); // Taller
+        JPanel pA = createOptionRow("A", rbA = new JRadioButton());
+        formPanel.add(pA, gbc);
+        gbc.gridy++;
+        txtOptA = (JTextField) pA.getClientProperty("field");
+
+        JPanel pB = createOptionRow("B", rbB = new JRadioButton());
+        formPanel.add(pB, gbc);
+        gbc.gridy++;
+        txtOptB = (JTextField) pB.getClientProperty("field");
+
+        JPanel pC = createOptionRow("C", rbC = new JRadioButton());
+        formPanel.add(pC, gbc);
+        gbc.gridy++;
+        txtOptC = (JTextField) pC.getClientProperty("field");
+
+        JPanel pD = createOptionRow("D", rbD = new JRadioButton());
+        formPanel.add(pD, gbc);
+        gbc.gridy++;
+        txtOptD = (JTextField) pD.getClientProperty("field");
+
+        // Add Radios
+        bgCorrect.add(rbA);
+        bgCorrect.add(rbB);
+        bgCorrect.add(rbC);
+        bgCorrect.add(rbD);
+        rbA.setActionCommand("A");
+        rbB.setActionCommand("B");
+        rbC.setActionCommand("C");
+        rbD.setActionCommand("D");
+        rbA.setSelected(true);
+
+        cardContent.add(formPanel, BorderLayout.CENTER);
+
+        // Footer: Action Buttons
+        JPanel cardFooter = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        cardFooter.setBackground(Color.WHITE);
+        cardFooter.setBorder(new EmptyBorder(20, 0, 0, 0));
+
+        NeoButton btnCancel = new NeoButton("Reset", Color.WHITE, Color.GRAY);
+        btnCancel.addActionListener(e -> resetForm());
+
+        NeoButton btnSave = new NeoButton("Simpan Soal", COL_PRIMARY, Color.WHITE);
+        btnSave.setPreferredSize(new Dimension(150, 40));
         btnSave.addActionListener(e -> saveQuestion());
 
-        actionPanel.add(btnReset);
-        actionPanel.add(btnSave);
+        cardFooter.add(btnCancel);
+        cardFooter.add(Box.createHorizontalStrut(10));
+        cardFooter.add(btnSave);
 
-        rightPanel.add(lblFormTitle, BorderLayout.NORTH);
-        rightPanel.add(formPanel, BorderLayout.CENTER);
-        rightPanel.add(actionPanel, BorderLayout.SOUTH);
+        cardContent.add(cardFooter, BorderLayout.SOUTH);
+        cardPanel.add(cardContent, BorderLayout.CENTER);
 
-        // === SPLIT PANE ===
-        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, leftPanel, rightPanel);
-        splitPane.setDividerLocation(450);
-        splitPane.setDividerSize(2);
-        splitPane.setBorder(null);
+        rightPanel.add(cardPanel); // Center the card styled panel
 
-        add(splitPane, BorderLayout.CENTER);
+        // Add Panel Kanan & Kiri ke Dialog
+        add(leftPanel, BorderLayout.WEST);
+        add(rightPanel, BorderLayout.CENTER);
     }
 
-    private JTextField createTextField() {
+    // === HELPER BUAT BIKIN UI UI LUCU ===
+
+    private JLabel createLabel(String text) {
+        JLabel l = new JLabel(text);
+        l.setFont(FONT_BOLD);
+        l.setForeground(Color.DARK_GRAY);
+        return l;
+    }
+
+    private JPanel createOptionRow(String label, JRadioButton rb) {
+        JPanel p = new JPanel(new BorderLayout(10, 0));
+        p.setOpaque(false);
+
+        // Radio Button buat pilih kunci
+        rb.setOpaque(false);
+        rb.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        rb.setToolTipText("Klik ini kalo jawaban '" + label + "' yang bener ngab");
+
+        // Label huruf (A/B/C/D)
+        JLabel lbl = new JLabel(label + ".");
+        lbl.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        lbl.setBorder(new EmptyBorder(0, 5, 0, 0));
+
+        // Text Input: G-Form style (Underline border)
         JTextField txt = new JTextField();
-        txt.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        txt.setFont(FONT_PLAIN);
+        txt.setBackground(new Color(250, 250, 250));
         txt.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(229, 231, 235), 1),
-                new EmptyBorder(8, 12, 8, 12)));
-        txt.setBackground(BG_LIGHT);
-        return txt;
+                BorderFactory.createMatteBorder(0, 0, 1, 0, Color.GRAY), // Underline
+                new EmptyBorder(5, 5, 5, 5)));
+
+        JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        left.setOpaque(false);
+        left.add(rb);
+        left.add(lbl);
+
+        p.add(left, BorderLayout.WEST);
+        p.add(txt, BorderLayout.CENTER);
+
+        // Simpen referensi field biar bisa diambil nanti
+        p.putClientProperty("field", txt);
+        return p;
     }
 
-    private JButton createBtn(String text, boolean bold, Color color) {
-        JButton btn = new JButton(text);
-        btn.setFont(new Font("Segoe UI", bold ? Font.BOLD : Font.PLAIN, 14));
-        btn.setBackground(color);
-        btn.setForeground(Color.WHITE);
-        btn.setFocusPainted(false);
-        btn.setBorderPainted(false);
-        btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        btn.setPreferredSize(new Dimension(0, 45));
-        return btn;
+    private void styleTable(JTable table) {
+        table.setRowHeight(40); // Agak tinggi biar lega
+        table.setShowGrid(false); // Clean look
+        table.setShowHorizontalLines(true);
+        table.setGridColor(new Color(230, 230, 230));
+        table.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        table.setSelectionBackground(new Color(232, 240, 254)); // Light Blue G-Style
+        table.setSelectionForeground(Color.BLACK);
+
+        JTableHeader th = table.getTableHeader();
+        th.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        th.setBackground(Color.WHITE);
+        th.setForeground(Color.GRAY);
+        th.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(220, 220, 220)));
+
+        // Kolom No & Kunci kecil aja
+        table.getColumnModel().getColumn(0).setMaxWidth(40);
+        table.getColumnModel().getColumn(2).setMaxWidth(60);
     }
 
-    private void addFormRow(JPanel p, GridBagConstraints gbc, String label, JComponent comp) {
-        JLabel lbl = new JLabel(label);
-        lbl.setFont(new Font("Segoe UI", Font.BOLD, 14));
-        lbl.setForeground(new Color(51, 65, 85));
-        gbc.gridy++;
-        p.add(lbl, gbc);
-        gbc.gridy++;
-        p.add(comp, gbc);
-    }
+    // === LOGIC DATABASE GAN ===
 
     private void loadQuestions() {
         questionModel.setRowCount(0);
         try (Connection conn = DBConnection.getConnection()) {
             String sql = "SELECT id, question_text, correct_answer FROM exam_questions WHERE exam_id = ? ORDER BY id ASC";
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setInt(1, examId);
-                try (ResultSet rs = ps.executeQuery()) {
-                    int no = 1;
-                    while (rs.next()) {
-                        String preview = rs.getString("question_text");
-                        if (preview.length() > 60)
-                            preview = preview.substring(0, 60) + "...";
-                        questionModel.addRow(new Object[] { no++, preview, rs.getString("correct_answer") });
-                    }
-                }
+            PreparedStatement ps = conn.prepareStatement(sql);
+            ps.setInt(1, examId);
+            ResultSet rs = ps.executeQuery();
+            int no = 1;
+            while (rs.next()) {
+                String qText = rs.getString("question_text");
+                // Potong dikit biar ga kepanjangan di tabel
+                if (qText.length() > 35)
+                    qText = qText.substring(0, 35) + "...";
+
+                questionModel.addRow(new Object[] {
+                        no++,
+                        qText,
+                        rs.getString("correct_answer")
+                });
             }
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Error load soal: " + e.getMessage());
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Gagal load soal: " + e.getMessage());
         }
     }
 
     private void loadSelectedQuestion() {
         int row = questionTable.getSelectedRow();
-        if (row == -1) {
-            JOptionPane.showMessageDialog(this, "Pilih soal terlebih dahulu!");
+        if (row == -1)
             return;
-        }
+
+        // Logicnya: ambil id berdasarkan urutan row (asumsi urutan sama kayak di
+        // DB/tabel)
+        // Agak risky kalo ada sort, tapi karena ORDER BY id ASC konsisten harusnya aman
+        // buat simple app.
+        // Di best practice sih simpen ID tersembunyi.
 
         try (Connection conn = DBConnection.getConnection()) {
+            // Kita pake LIMIT OFFSET buat ambil soal ke-sekian
             String sql = "SELECT * FROM exam_questions WHERE exam_id = ? ORDER BY id ASC LIMIT 1 OFFSET ?";
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setInt(1, examId);
-                ps.setInt(2, row);
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) {
-                        txtQuestion.setText(rs.getString("question_text"));
-                        txtOptA.setText(rs.getString("option_a"));
-                        txtOptB.setText(rs.getString("option_b"));
-                        txtOptC.setText(rs.getString("option_c"));
-                        txtOptD.setText(rs.getString("option_d"));
-                        cmbCorrect.setSelectedItem(rs.getString("correct_answer"));
-                    }
-                }
+            PreparedStatement ps = conn.prepareStatement(sql);
+            ps.setInt(1, examId);
+            ps.setInt(2, row);
+
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) {
+                txtQuestion.setText(rs.getString("question_text"));
+                txtOptA.setText(rs.getString("option_a"));
+                txtOptB.setText(rs.getString("option_b"));
+                txtOptC.setText(rs.getString("option_c"));
+                txtOptD.setText(rs.getString("option_d"));
+
+                String correct = rs.getString("correct_answer");
+                if ("A".equals(correct))
+                    rbA.setSelected(true);
+                else if ("B".equals(correct))
+                    rbB.setSelected(true);
+                else if ("C".equals(correct))
+                    rbC.setSelected(true);
+                else if ("D".equals(correct))
+                    rbD.setSelected(true);
             }
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "❌ Gagal load: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
-    private void clearForm() {
+    private void resetForm() {
+        questionTable.clearSelection();
         txtQuestion.setText("");
         txtOptA.setText("");
         txtOptB.setText("");
         txtOptC.setText("");
         txtOptD.setText("");
-        cmbCorrect.setSelectedIndex(0);
+        rbA.setSelected(true); // Default A
+        txtQuestion.requestFocus();
     }
 
     private void saveQuestion() {
-        String q = txtQuestion.getText().trim();
-        String a = txtOptA.getText().trim();
-        String b = txtOptB.getText().trim();
-        String c = txtOptC.getText().trim();
-        String d = txtOptD.getText().trim();
-        String correct = (String) cmbCorrect.getSelectedItem();
+        // VALIDASI BIAR GA KOSONG KEK HATI JOMBLO
+        if (txtQuestion.getText().trim().isEmpty() ||
+                txtOptA.getText().trim().isEmpty() ||
+                txtOptB.getText().trim().isEmpty() ||
+                txtOptC.getText().trim().isEmpty() ||
+                txtOptD.getText().trim().isEmpty()) {
 
-        if (q.isEmpty() || a.isEmpty() || b.isEmpty() || c.isEmpty() || d.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "⚠️ Semua field harus diisi!");
+            JOptionPane.showMessageDialog(this, "Waduh kosong ngab! Isi semua field dlu ya 🙏");
             return;
         }
 
-        // Retry logic for database locked error
-        int maxRetries = 3;
-        for (int attempt = 1; attempt <= maxRetries; attempt++) {
-            try (Connection conn = DBConnection.getConnection()) {
-                conn.setAutoCommit(false); // Start transaction
+        String selectedAns = "A";
+        if (rbB.isSelected())
+            selectedAns = "B";
+        if (rbC.isSelected())
+            selectedAns = "C";
+        if (rbD.isSelected())
+            selectedAns = "D";
 
-                String sql = "INSERT INTO exam_questions(exam_id, question_text, option_a, option_b, option_c, option_d, correct_answer) VALUES(?,?,?,?,?,?,?)";
-                try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                    ps.setInt(1, examId);
-                    ps.setString(2, q);
-                    ps.setString(3, a);
-                    ps.setString(4, b);
-                    ps.setString(5, c);
-                    ps.setString(6, d);
-                    ps.setString(7, correct);
-                    ps.executeUpdate();
+        // Cek update atau insert
+        int row = questionTable.getSelectedRow();
+        boolean isUpdate = (row != -1);
+
+        try (Connection conn = DBConnection.getConnection()) {
+            if (isUpdate) {
+                // UPDATE BOSS
+                // Ambil ID dlu pake offset yg sama
+                String sqlGetId = "SELECT id FROM exam_questions WHERE exam_id = ? ORDER BY id ASC LIMIT 1 OFFSET ?";
+                PreparedStatement psId = conn.prepareStatement(sqlGetId);
+                psId.setInt(1, examId);
+                psId.setInt(2, row);
+                ResultSet rsId = psId.executeQuery();
+                if (rsId.next()) {
+                    int qId = rsId.getInt("id");
+                    String sqlUpd = "UPDATE exam_questions SET question_text=?, option_a=?, option_b=?, option_c=?, option_d=?, correct_answer=? WHERE id=?";
+                    PreparedStatement psUpd = conn.prepareStatement(sqlUpd);
+                    psUpd.setString(1, txtQuestion.getText());
+                    psUpd.setString(2, txtOptA.getText());
+                    psUpd.setString(3, txtOptB.getText());
+                    psUpd.setString(4, txtOptC.getText());
+                    psUpd.setString(5, txtOptD.getText());
+                    psUpd.setString(6, selectedAns);
+                    psUpd.setInt(7, qId);
+                    psUpd.executeUpdate();
+                    JOptionPane.showMessageDialog(this, "Soal berhasil di-update! Mantap jiwa 🔥");
                 }
-
-                conn.commit(); // Commit transaction
-                JOptionPane.showMessageDialog(this, "✅ Soal berhasil disimpan!");
-                clearForm();
-                loadQuestions();
-                return; // Success, exit retry loop
-
-            } catch (Exception e) {
-                if (e.getMessage().contains("locked") && attempt < maxRetries) {
-                    // Database locked, wait and retry
-                    try {
-                        Thread.sleep(300); // Wait 300ms before retry
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                    }
-                } else {
-                    // Final attempt failed or different error
-                    JOptionPane.showMessageDialog(this,
-                            "<html><b>❌ Gagal menyimpan soal!</b><br><br>" +
-                                    "Error: " + e.getMessage() + "<br><br>" +
-                                    "<i>Tips: Tutup dialog lain yang mungkin masih terbuka.</i></html>",
-                            "Error",
-                            JOptionPane.ERROR_MESSAGE);
-                    e.printStackTrace();
-                    return;
-                }
+            } else {
+                // INSERT NEW
+                String sqlIns = "INSERT INTO exam_questions(exam_id, question_text, option_a, option_b, option_c, option_d, correct_answer) VALUES(?,?,?,?,?,?,?)";
+                PreparedStatement psIns = conn.prepareStatement(sqlIns);
+                psIns.setInt(1, examId);
+                psIns.setString(2, txtQuestion.getText());
+                psIns.setString(3, txtOptA.getText());
+                psIns.setString(4, txtOptB.getText());
+                psIns.setString(5, txtOptC.getText());
+                psIns.setString(6, txtOptD.getText());
+                psIns.setString(7, selectedAns);
+                psIns.executeUpdate();
+                JOptionPane.showMessageDialog(this, "Soal baru tersimpan! Lanjuttt 🚀");
             }
+
+            // Refresh
+            resetForm();
+            loadQuestions();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Gagal save: " + e.getMessage());
         }
     }
 
     private void deleteQuestion() {
         int row = questionTable.getSelectedRow();
         if (row == -1) {
-            JOptionPane.showMessageDialog(this, "Pilih soal yang akan dihapus!");
+            JOptionPane.showMessageDialog(this, "Pilih soal yg mau dihapus dlu ngab!");
             return;
         }
 
-        int confirm = JOptionPane.showConfirmDialog(this, "Yakin ingin menghapus soal ini?", "Konfirmasi",
-                JOptionPane.YES_NO_OPTION);
-        if (confirm != JOptionPane.YES_OPTION)
+        if (JOptionPane.YES_OPTION != JOptionPane.showConfirmDialog(this, "Yakin mau apus soal ini?", "Confirm Delete",
+                JOptionPane.YES_NO_OPTION)) {
             return;
+        }
 
         try (Connection conn = DBConnection.getConnection()) {
-            String sql = "DELETE FROM exam_questions WHERE exam_id = ? AND id = (SELECT id FROM exam_questions WHERE exam_id = ? ORDER BY id LIMIT 1 OFFSET ?)";
-            PreparedStatement ps = conn.prepareStatement(sql);
-            ps.setInt(1, examId);
-            ps.setInt(2, examId);
-            ps.setInt(3, row);
-            ps.executeUpdate();
-            JOptionPane.showMessageDialog(this, "✅ Soal dihapus!");
-            clearForm();
-            loadQuestions();
+            // Ambil ID dlu pake offset
+            String sqlGetId = "SELECT id FROM exam_questions WHERE exam_id = ? ORDER BY id ASC LIMIT 1 OFFSET ?";
+            PreparedStatement psId = conn.prepareStatement(sqlGetId);
+            psId.setInt(1, examId);
+            psId.setInt(2, row);
+            ResultSet rsId = psId.executeQuery();
+            if (rsId.next()) {
+                int qId = rsId.getInt("id");
+                String sqlDel = "DELETE FROM exam_questions WHERE id=?";
+                PreparedStatement psDel = conn.prepareStatement(sqlDel);
+                psDel.setInt(1, qId);
+                psDel.executeUpdate();
+                JOptionPane.showMessageDialog(this, "Soal berpulang ke rahmatullah (dihapus) 🥀");
+                resetForm();
+                loadQuestions();
+            }
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "❌ Gagal: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
@@ -363,28 +504,108 @@ public class ManualQuestionEditorDialog extends JDialog {
         JFileChooser fc = new JFileChooser();
         fc.setSelectedFile(new java.io.File("Soal_Ujian_" + examId + ".pdf"));
         if (fc.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
-            java.util.List<id.ac.campus.antiexam.model.Question> list = new java.util.ArrayList<>();
-            try (Connection conn = DBConnection.getConnection()) {
-                String sql = "SELECT * FROM exam_questions WHERE exam_id = ? ORDER BY id ASC";
-                PreparedStatement ps = conn.prepareStatement(sql);
-                ps.setInt(1, examId);
-                ResultSet rs = ps.executeQuery();
-                while (rs.next()) {
-                    id.ac.campus.antiexam.model.Question q = new id.ac.campus.antiexam.model.Question();
-                    q.setQuestionText(rs.getString("question_text"));
-                    q.setOptionA(rs.getString("option_a"));
-                    q.setOptionB(rs.getString("option_b"));
-                    q.setOptionC(rs.getString("option_c"));
-                    q.setOptionD(rs.getString("option_d"));
-                    list.add(q);
+            try {
+                // Helper list
+                List<id.ac.campus.antiexam.model.Question> qList = new ArrayList<>();
+                // Populate manually for now as we might not have 'Question' model easily
+                // accessible
+                // Wait, use DB fetch
+                try (Connection conn = DBConnection.getConnection()) {
+                    String sql = "SELECT * FROM exam_questions WHERE exam_id = ? ORDER BY id ASC";
+                    PreparedStatement ps = conn.prepareStatement(sql);
+                    ps.setInt(1, examId);
+                    ResultSet rs = ps.executeQuery();
+                    while (rs.next()) {
+                        id.ac.campus.antiexam.model.Question q = new id.ac.campus.antiexam.model.Question();
+                        q.setQuestionText(rs.getString("question_text"));
+                        q.setOptionA(rs.getString("option_a"));
+                        q.setOptionB(rs.getString("option_b"));
+                        q.setOptionC(rs.getString("option_c"));
+                        q.setOptionD(rs.getString("option_d"));
+                        qList.add(q);
+                    }
                 }
-                id.ac.campus.antiexam.service.PdfExportService.exportQuestionsToPdf(list,
-                        "BANK SOAL - UJIAN ID " + examId, fc.getSelectedFile());
-                JOptionPane.showMessageDialog(this, "✅ Soal berhasil diekspor ke PDF!");
+
+                PdfExportService.exportQuestionsToPdf(qList, "BANK SOAL - EXAM " + examId, fc.getSelectedFile());
+                JOptionPane.showMessageDialog(this, "Export PDF Sukses! Share ke mahasiswa gih 📄");
             } catch (Exception e) {
                 e.printStackTrace();
-                JOptionPane.showMessageDialog(this, "Gagal ekspor: " + e.getMessage());
+                JOptionPane.showMessageDialog(this, "Gagal export: " + e.getMessage());
             }
+        }
+    }
+
+    // === NEO BUTTON CLASS (Private Styling) ===
+    private static class NeoButton extends JButton {
+        private Color bg, fg;
+
+        public NeoButton(String text, Color bg, Color fg) {
+            super(text);
+            this.bg = bg;
+            this.fg = fg;
+            setContentAreaFilled(false);
+            setFocusPainted(false);
+            setBorderPainted(false);
+            setCursor(new Cursor(Cursor.HAND_CURSOR));
+            setFont(new Font("Segoe UI", Font.BOLD, 14));
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
+
+            // Shadow
+            g2.setColor(Color.BLACK);
+            g2.fillRect(4, 4, getWidth() - 4, getHeight() - 4);
+
+            // Main Rect
+            if (getModel().isPressed()) {
+                g2.translate(2, 2);
+            }
+            g2.setColor(bg);
+            g2.fillRect(0, 0, getWidth() - 4, getHeight() - 4);
+            g2.setColor(Color.BLACK);
+            g2.setStroke(new BasicStroke(2));
+            g2.drawRect(0, 0, getWidth() - 4, getHeight() - 4);
+
+            // Text
+            g2.setColor(fg);
+            FontMetrics fm = g2.getFontMetrics();
+            int x = (getWidth() - 4 - fm.stringWidth(getText())) / 2;
+            int y = (getHeight() - 4 - fm.getHeight()) / 2 + fm.getAscent();
+            g2.drawString(getText(), x, y);
+
+            g2.dispose();
+        }
+    }
+
+    // === NEO CARD CLASS (KARTU ELEGAN) ===
+    private static class NeoCard extends JPanel {
+        public NeoCard() {
+            setOpaque(false);
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            int shadowOffset = 5;
+
+            // Shadow
+            g2.setColor(new Color(200, 200, 200));
+            g2.fillRoundRect(shadowOffset, shadowOffset, getWidth() - shadowOffset, getHeight() - shadowOffset, 15, 15);
+
+            // Main Card
+            g2.setColor(Color.WHITE);
+            g2.fillRoundRect(0, 0, getWidth() - shadowOffset, getHeight() - shadowOffset, 15, 15);
+
+            // Border tipis
+            g2.setColor(new Color(220, 220, 220));
+            g2.drawRoundRect(0, 0, getWidth() - shadowOffset, getHeight() - shadowOffset, 15, 15);
+
+            g2.dispose();
         }
     }
 }
