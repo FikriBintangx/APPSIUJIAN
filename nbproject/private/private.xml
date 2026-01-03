@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project-private xmlns="http://www.netbeans.org/ns/project-private/1">
+    <editor-bookmarks xmlns="http://www.netbeans.org/ns/editor-bookmarks/2" lastBookmarkId="0"/>
+    <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/2">
+        <group>
+            <file>file:/C:/Users/fikri/Documents/NetBeansProjects/Appujian/src/id/ac/campus/antiexam/config/DBConnection.java</file>
+            <file>file:/C:/Users/fikri/Documents/NetBeansProjects/Appujian/src/id/ac/campus/antiexam/ui/AdminLoginFrame.java</file>
+            <file>file:/C:/Users/fikri/Documents/NetBeansProjects/Appujian/src/id/ac/campus/antiexam/ui/LecturerLoginFrame.java</file>
+            <file>file:/C:/Users/fikri/Documents/NetBeansProjects/Appujian/src/id/ac/campus/antiexam/client/ExamClientFrame.java</file>
+            <file>file:/C:/Users/fikri/Documents/NetBeansProjects/Appujian/src/id/ac/campus/antiexam/model/Exam.java</file>
+            <file>file:/C:/Users/fikri/Documents/NetBeansProjects/Appujian/src/id/ac/campus/antiexam/repository/AuthRepository.java</file>
+            <file>file:/C:/Users/fikri/Documents/NetBeansProjects/Appujian/src/id/ac/campus/antiexam/model/QuestionType.java</file>
+            <file>file:/C:/Users/fikri/Documents/NetBeansProjects/Appujian/src/id/ac/campus/antiexam/repository/LecturerRepository.java</file>
+            <file>file:/C:/Users/fikri/Documents/NetBeansProjects/Appujian/src/id/ac/campus/antiexam/model/Violation.java</file>
+            <file>file:/C:/Users/fikri/Documents/NetBeansProjects/Appujian/src/id/ac/campus/antiexam/model/Question.java</file>
+            <file>file:/C:/Users/fikri/Documents/NetBeansProjects/Appujian/src/id/ac/campus/antiexam/service/QuestionImporter.java</file>
+            <file>file:/C:/Users/fikri/Documents/NetBeansProjects/Appujian/src/id/ac/campus/antiexam/model/ExamSession.java</file>
+            <file>file:/C:/Users/fikri/Documents/NetBeansProjects/Appujian/src/id/ac/campus/antiexam/ui/StudentExamFrame.java</file>
+            <file>file:/C:/Users/fikri/Documents/NetBeansProjects/Appujian/src/id/ac/campus/antiexam/Main.java</file>
+            <file>file:/C:/Users/fikri/Documents/NetBeansProjects/Appujian/src/id/ac/campus/antiexam/repository/SessionRepository.java</file>
+            <file>file:/C:/Users/fikri/Documents/NetBeansProjects/Appujian/src/id/ac/campus/antiexam/repository/ExamRepository.java</file>
+            <file>file:/C:/Users/fikri/Documents/NetBeansProjects/Appujian/src/id/ac/campus/antiexam/ui/LecturerDashboardFrame.java</file>
+            <file>file:/C:/Users/fikri/Documents/NetBeansProjects/Appujian/src/id/ac/campus/antiexam/model/Option.java</file>
+            <file>file:/C:/Users/fikri/Documents/NetBeansProjects/Appujian/src/id/ac/campus/antiexam/ui/AdminScheduleFrame.java</file>
+            <file>file:/C:/Users/fikri/Documents/NetBeansProjects/Appujian/src/id/ac/campus/antiexam/ui/PDFViewerPanel.java</file>
+            <file>file:/C:/Users/fikri/Documents/NetBeansProjects/Appujian/src/id/ac/campus/antiexam/MainLauncher.java</file>
+            <file>file:/C:/Users/fikri/Documents/NetBeansProjects/Appujian/src/id/ac/campus/antiexam/repository/SubjectRepository.java</file>
+        </group>
+    </open-files>
+</project-private>
