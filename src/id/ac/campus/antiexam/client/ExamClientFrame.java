@@ -1,7 +1,7 @@
 package id.ac.campus.antiexam.client;
 
-import id.ac.campus.antiexam.config.DBConnection;
-import id.ac.campus.antiexam.repository.SessionRepository;
+import id.ac.campus.antiexam.konfigurasi.KoneksiDatabase;
+import id.ac.campus.antiexam.data.SesiUjianData;
 
 import javax.swing.JFrame;
 import javax.swing.JPanel;
@@ -42,7 +42,7 @@ public class ExamClientFrame extends JFrame {
     private Timer countdownTimer;
     private Timer commandTimer;
 
-    private final SessionRepository sessionRepository = new SessionRepository();
+    private final SesiUjianData sessionRepository = new SesiUjianData();
 
     public ExamClientFrame(int sessionId, String studentName, String token, int durationMinutes) {
         this.sessionId = sessionId;
@@ -74,14 +74,14 @@ public class ExamClientFrame extends JFrame {
 
         JPanel center = new JPanel(new BorderLayout(10, 10));
         center.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
-        JLabel lblQuestion = new JLabel("Soal: Jelaskan konsep OOP secara singkat.", SwingConstants.LEFT);
-        lblQuestion.setFont(new Font("SansSerif", Font.PLAIN, 18));
+        JLabel lblSoal = new JLabel("Soal: Jelaskan konsep OOP secara singkat.", SwingConstants.LEFT);
+        lblSoal.setFont(new Font("SansSerif", Font.PLAIN, 18));
         txtAnswer = new JTextArea();
         txtAnswer.setLineWrap(true);
         txtAnswer.setWrapStyleWord(true);
         txtAnswer.setFont(new Font("SansSerif", Font.PLAIN, 16));
         txtAnswer.setBorder(BorderFactory.createLineBorder(Color.GRAY));
-        center.add(lblQuestion, BorderLayout.NORTH);
+        center.add(lblSoal, BorderLayout.NORTH);
         center.add(new JScrollPane(txtAnswer), BorderLayout.CENTER);
         add(center, BorderLayout.CENTER);
 
@@ -121,7 +121,7 @@ public class ExamClientFrame extends JFrame {
     private void initFocusListener() {
         addWindowListener(new WindowAdapter() {
             public void windowLostFocus(WindowEvent e) {
-                handleViolation("FOCUS_LOST");
+                handlePelanggaran("FOCUS_LOST");
             }
         });
     }
@@ -131,7 +131,7 @@ public class ExamClientFrame extends JFrame {
             return;
         }
         if (remainingSeconds <= 0) {
-            finishExam(true);
+            finishUjian(true);
             return;
         }
         remainingSeconds--;
@@ -140,12 +140,12 @@ public class ExamClientFrame extends JFrame {
         lblTimer.setText(String.format("%02d:%02d", m, s));
     }
 
-    private void handleViolation(String type) {
+    private void handlePelanggaran(String type) {
         if (locked) {
             return;
         }
         try {
-            violationCount = sessionRepository.logViolation(sessionId, type);
+            violationCount = sessionRepository.logPelanggaran(sessionId, type);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -170,7 +170,7 @@ public class ExamClientFrame extends JFrame {
             return;
         }
         try {
-            Connection conn = DBConnection.getConnection();
+            Connection conn = KoneksiDatabase.getConnection();
             String sql = "SELECT id, command FROM admin_commands WHERE session_id=? AND processed=0";
             PreparedStatement ps = conn.prepareStatement(sql);
             ps.setInt(1, sessionId);
@@ -182,7 +182,7 @@ public class ExamClientFrame extends JFrame {
                     applyUnlock();
                 }
                 if ("FORCE_FINISH".equalsIgnoreCase(cmd)) {
-                    finishExam(false);
+                    finishUjian(false);
                 }
                 markCommandProcessed(cmdId);
             }
@@ -193,7 +193,7 @@ public class ExamClientFrame extends JFrame {
 
     private void markCommandProcessed(int id) {
         try {
-            Connection conn = DBConnection.getConnection();
+            Connection conn = KoneksiDatabase.getConnection();
             String sql = "UPDATE admin_commands SET processed=1 WHERE id=?";
             PreparedStatement ps = conn.prepareStatement(sql);
             ps.setInt(1, id);
@@ -224,11 +224,11 @@ public class ExamClientFrame extends JFrame {
         int result = JOptionPane.showConfirmDialog(this, "Kumpulkan jawaban sekarang?", "Konfirmasi",
                 JOptionPane.YES_NO_OPTION);
         if (result == JOptionPane.YES_OPTION) {
-            finishExam(false);
+            finishUjian(false);
         }
     }
 
-    private void finishExam(boolean timeUp) {
+    private void finishUjian(boolean timeUp) {
         countdownTimer.stop();
         commandTimer.stop();
         try {
@@ -245,7 +245,7 @@ public class ExamClientFrame extends JFrame {
 
     private void saveAnswer() {
         try {
-            Connection conn = DBConnection.getConnection();
+            Connection conn = KoneksiDatabase.getConnection();
             String sql = "INSERT INTO exams_answers(session_id, answer_text) VALUES(?,?)";
             PreparedStatement ps = conn.prepareStatement(sql);
             ps.setInt(1, sessionId);

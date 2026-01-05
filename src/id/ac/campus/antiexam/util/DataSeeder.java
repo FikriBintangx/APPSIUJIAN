@@ -1,6 +1,6 @@
 package id.ac.campus.antiexam.util;
 
-import id.ac.campus.antiexam.config.DBConnection;
+import id.ac.campus.antiexam.konfigurasi.KoneksiDatabase;
 import java.sql.Connection;
 import java.sql.Statement;
 
@@ -11,73 +11,73 @@ public class DataSeeder {
     }
 
     public static void seed() {
-        System.out.println("🌱 Starting Data Seeder...");
-        try (Connection conn = DBConnection.getConnection()) {
+        System.out.println("ðŸŒ± Starting Data Seeder...");
+        try (Connection conn = KoneksiDatabase.getConnection()) {
 
-            // 1. Create Tables if not exist
+            // 1. bikin tabel kalo belum ada
             Statement stmt = conn.createStatement();
 
-            // Admins
-            stmt.execute("CREATE TABLE IF NOT EXISTS admins (" +
+            // tabel admin
+            stmt.execute("CREATE TABLE IF NOT EXISTS admin (" +
                     "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
                     "username TEXT UNIQUE, " +
                     "password TEXT)");
 
-            // Lecturers
-            stmt.execute("CREATE TABLE IF NOT EXISTS lecturers (" +
+            // tabel dosen
+            stmt.execute("CREATE TABLE IF NOT EXISTS dosen (" +
                     "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
                     "username TEXT UNIQUE, " +
                     "password TEXT, " +
                     "name TEXT)");
 
-            // Proctors
-            stmt.execute("CREATE TABLE IF NOT EXISTS proctors (" +
+            // tabel pengawas
+            stmt.execute("CREATE TABLE IF NOT EXISTS pengawas (" +
                     "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
                     "username TEXT UNIQUE, " +
                     "password TEXT, " +
                     "name TEXT)");
 
-            // Students
-            stmt.execute("CREATE TABLE IF NOT EXISTS students (" +
+            // tabel mahasiswa
+            stmt.execute("CREATE TABLE IF NOT EXISTS mahasiswa (" +
                     "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
                     "name TEXT, " +
-                    "student_number TEXT UNIQUE, " +
-                    "class_name TEXT)");
+                    "nim TEXT UNIQUE, " +
+                    "nama_kelas TEXT)");
 
-            // Exams (Needed for student test) -- minimal
-            stmt.execute("CREATE TABLE IF NOT EXISTS exams (" +
+            // tabel ujian (versi simple buat seeder)
+            stmt.execute("CREATE TABLE IF NOT EXISTS ujian (" +
                     "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
-                    "token TEXT, code TEXT, class_name TEXT, title TEXT, course TEXT, " +
-                    "type TEXT, duration_min INTEGER, start_time DATETIME, status TEXT)");
+                    "token TEXT, code TEXT, target_kelas TEXT, title TEXT, kode_matkul TEXT, " +
+                    "type TEXT, durasi_menit INTEGER, jadwal_waktu DATETIME, status TEXT)");
 
-            // 2. Insert Test Data
+            // 2. masukin data testing
 
-            // Admin
-            insertOrSkip(conn, "INSERT INTO admins (username, password) VALUES ('admin', 'admin123')");
+            // data admin
+            insertOrSkip(conn, "INSERT INTO admin (username, password) VALUES ('admin', 'admin123')");
 
-            // Lecturer
+            // data dosen
             insertOrSkip(conn,
-                    "INSERT INTO lecturers (username, password, name) VALUES ('dosen', 'dosen123', 'Dr. Budi Santoso')");
+                    "INSERT INTO dosen (username, password, name) VALUES ('dosen', 'dosen123', 'Dr. Budi Santoso')");
 
-            // Proctor
+            // data pengawas
             insertOrSkip(conn,
-                    "INSERT INTO proctors (username, password, name) VALUES ('pengawas', 'pengawas123', 'Siti Aminah, S.Kom')");
+                    "INSERT INTO pengawas (username, password, name) VALUES ('pengawas', 'pengawas123', 'Siti Aminah, S.Kom')");
 
-            // Student
+            // data mahasiswa
             insertOrSkip(conn,
-                    "INSERT INTO students (name, student_number, class_name) VALUES ('Mahasiswa Test', '12345678', 'TI-2024')");
+                    "INSERT INTO mahasiswa (name, nim, nama_kelas) VALUES ('Mahasiswa Test', '12345678', 'TI-2024')");
 
-            System.out.println("✅ Data Seeder Completed Successfully!");
+            System.out.println("âœ… Data Seeder Completed Successfully!");
             System.out.println("   -------------------------------------------------");
-            System.out.println("   🔑 Admin    : admin / admin123");
-            System.out.println("   🔑 Dosen    : dosen / dosen123");
-            System.out.println("   🔑 Pengawas : pengawas / pengawas123");
-            System.out.println("   🔑 Student  : 'Mahasiswa Test' / NIM: 12345678");
+            System.out.println("   ðŸ”‘ Admin    : admin / admin123");
+            System.out.println("   ðŸ”‘ Dosen    : dosen / dosen123");
+            System.out.println("   ðŸ”‘ Pengawas : pengawas / pengawas123");
+            System.out.println("   ðŸ”‘ Student  : 'Mahasiswa Test' / NIM: 12345678");
             System.out.println("   -------------------------------------------------");
 
         } catch (Exception e) {
             e.printStackTrace();
-            System.err.println("❌ Seeder Failed: " + e.getMessage());
+            System.err.println("âŒ Seeder Failed: " + e.getMessage());
         }
     }
 
@@ -85,9 +85,9 @@ public class DataSeeder {
         try {
             conn.createStatement().execute(sql);
         } catch (Exception e) {
-            // Ignore unique constraint violations (data already exists)
+            // abaikan error unique constraint (data udah ada)
             if (!e.getMessage().contains("UNIQUE constraint failed")) {
-                // System.out.println(" Info: " + e.getMessage());
+ // System.out.println(" info: " + e.getMessage());
             }
         }
     }
