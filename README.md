@@ -5,7 +5,7 @@
 ![Neo-Brutalism](https://img.shields.io/badge/Design-Neo--Brutalism-black?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
-> **"Ujian santuy, tapi anti-curang club!"** 🚀
+> **"Ujian anti curang curang club!"** 🚀
 
 **SiUjian** bukan aplikasi ujian biasa. Ini adalah platform ujian berbasis desktop dengan desain **Neo-Brutalism** yang _eye-catching_ dan fitur keamanan yang bikin mahasiswa mikir dua kali buat nyontek. Dibuat khusus buat dosen gaul dan pengawas tegas!
 
